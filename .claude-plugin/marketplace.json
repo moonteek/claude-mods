@@ -1,0 +1,17 @@
+{
+  "name": "claude-mods",
+  "owner": { "name": "moonteek" },
+  "metadata": { "description": "Claude Code mods: a memory bar and a live task checklist above the prompt." },
+  "plugins": [
+    {
+      "name": "memory-bar",
+      "source": "./memory-bar",
+      "description": "Shows how full Claude's context window (its working memory) is, as a bar above the prompt."
+    },
+    {
+      "name": "task-steps",
+      "source": "./task-steps",
+      "description": "Shows the steps Claude plans for your task, and its progress through them, above the prompt."
+    }
+  ]
+}

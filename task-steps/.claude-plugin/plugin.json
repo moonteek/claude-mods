@@ -1,0 +1,7 @@
+{
+  "name": "task-steps",
+  "version": "0.1.0",
+  "author": { "name": "moonteek" },
+  "description": "Shows the steps Claude plans for your task, and its progress through them, above the prompt.",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "memory-bar",
+  "version": "0.1.0",
+  "author": { "name": "moonteek" },
+  "description": "Shows how full Claude's context window (its working memory) is, as a bar above the prompt.",
+  "types": "./types/index.d.ts"
+}
