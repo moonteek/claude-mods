@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
+import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
 import type { Limit, Memory } from '../types'
 
@@ -48,14 +48,45 @@ export const bar = (percent: number) => {
   return { filled: '━'.repeat(filled), empty: '─'.repeat(WIDTH - filled) }
 }
 
+// Rate limits are the account's, but a session only learns them from its first reply. The latest
+// reading goes in the cross-session store, so every session shows it from the start and picks up
+// readings other sessions made.
+const READING = 'rateLimits'
+type Reading = { at: number; limits: Limit[] }
+
+async function saveReading($: EngineInterface, list: Limit[]) {
+  if (list.length > 0) {
+    const reading: Reading = { at: await $.clock.now(), limits: list }
+    await $.store.set(READING, reading)
+  }
+}
+
+async function loadReading($: EngineInterface) {
+  const reading = (await $.store.get(READING)) as Reading | undefined
+  if (reading !== undefined && reading.limits.length > 0) {
+    await update($, limits, () => reading.limits)
+  }
+}
+
+async function tick($: EngineInterface) {
+  await loadReading($)
+  // Keep the reset countdowns current while the session sits idle.
+  $.ui.invalidate('ui.render')
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     const usage = await $.session.usage()
     await update($, memory, () => toMemory(usage.context))
-    await update($, limits, () => toLimits(usage.rateLimits))
-    // Keep the reset countdowns current while the session sits idle.
-    $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
+    const live = toLimits(usage.rateLimits)
+    if (live.length > 0) {
+      await update($, limits, () => live)
+      await saveReading($, live)
+    } else {
+      await loadReading($)
+    }
+    $.clock.every(60_000, () => tick($))
     return result
   })
 
@@ -64,7 +95,9 @@ export const register: Register = on => {
       await update($, memory, () => toMemory(e.context))
     }
     if (e.changed.includes('rateLimits')) {
-      await update($, limits, () => toLimits(e.rateLimits))
+      const live = toLimits(e.rateLimits)
+      await update($, limits, () => live)
+      await saveReading($, live)
     }
     return next(e)
   })
@@ -113,7 +146,13 @@ export const register: Register = on => {
             value.percent >= 85 ? '/compact' : undefined,
           )
         )}
-        {windows.map(limit => row(NAMES[limit.kind] ?? limit.kind, limit.percent, until(limit.resetsAt, now)))}
+        {windows.map(limit => {
+          // A saved reading may outlive its window: past its reset, the window starts over empty.
+          const isReset = limit.resetsAt !== undefined && Date.parse(limit.resetsAt) <= now
+          return isReset
+            ? row(NAMES[limit.kind] ?? limit.kind, 0, 'just reset')
+            : row(NAMES[limit.kind] ?? limit.kind, limit.percent, until(limit.resetsAt, now))
+        })}
       </Box>
     )
   })
