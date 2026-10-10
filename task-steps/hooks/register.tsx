@@ -14,7 +14,7 @@ const cut = (text: string, room: number) =>
 const isFinished = (current: Task | null) =>
   current === null || current.steps.every(step => step.status === 'completed')
 
-// A new list after the last one finished is a new task: it takes the latest prompt as its title.
+// The first list after a prompt (or after the last list finished) takes that prompt as its title.
 const withSteps = (current: Task | null, title: string, steps: Step[]): Task | null =>
   steps.length === 0 ? null : { title: isFinished(current) ? title : (current?.title ?? title), steps }
 
@@ -35,7 +35,9 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     const line = e.text.trim().split('\n')[0] ?? ''
     if (line !== '' && !line.startsWith('/')) {
+      // A new prompt is a new task: clear the old checklist so the next plan starts fresh under this title.
       await update($, prompt, () => line)
+      await update($, task, () => null)
     }
     return next(e)
   }).catch(($, e, next) => next(e))

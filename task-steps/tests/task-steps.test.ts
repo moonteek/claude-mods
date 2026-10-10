@@ -35,4 +35,21 @@ for (const surface of SURFACES) {
     expect(await ui.find({ text: 'Refactor the API' })).toBeDefined()
     expect(await ui.find({ text: '1/3' })).toBeDefined()
   })
+
+  test(`a new prompt replaces an unfinished task on ${surface}`, async ($, on) => {
+    on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
+    on('ui.render', () => ({ type: 'Box', children: [] }) as never)
+    await $.prompt.submit({ text: 'Old task' } as never)
+    await $.tool.call({ tool: 'mcp__task-steps__steps', steps: todos } as never)
+
+    await $.prompt.submit({ text: 'New task' } as never)
+    const ui = await $.ui.mount({ plugin: 'task-steps', surface, component: 'AbovePrompt', props: PROPS as never })
+    expect(await ui.find({ text: 'Old task' })).toBeUndefined()
+
+    const fresh = [{ content: 'Plan it', activeForm: 'Planning it', status: 'in_progress' }]
+    await $.tool.call({ tool: 'mcp__task-steps__steps', steps: fresh } as never)
+    expect(await ui.find({ text: 'New task' })).toBeDefined()
+    expect(await ui.find({ text: '0/1' })).toBeDefined()
+    expect(await ui.find({ text: 'Old task' })).toBeUndefined()
+  })
 }
